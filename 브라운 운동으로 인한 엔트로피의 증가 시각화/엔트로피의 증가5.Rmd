@@ -1,0 +1,165 @@
+---
+title: "Increasing Entropy"
+author: "한상혁"
+date: "2019년 5월 13일"
+output: html_document
+---
+
+```{r}
+if(require(plot3D)==F){
+  
+  install.packages("plot3D")
+  library(plot3D)
+}
+
+if(require(magrittr)==F){
+  
+  install.packages("magrittr")
+  library(magrittr)
+}
+
+nm<- 40 # number of molecules # 온도 구분을 위해서 짝수만 사용함
+
+repeat{ # 처음 분자들의 좌표를 정해주는 기능
+  
+  dc<- data.frame(particle= 1:nm, Temp= rep(c(1,2), each= nm/2), num= 0, x= runif(nm, min=0, max= 4), y= runif(nm, min=0, max= 10),
+                  z= runif(nm, min=0, max= 10), delx= 0, dely= 0, delz= 0, mc= 0, om= -1) # dc: dots' coordinate, mc: move count, om: object move  # Temp의 1: low, 2: high
+  
+  if(!any(duplicated(dc[,4:6]))){ # 좌표가 겹치는 분자가 있는 지를 확인해서 없으면 repeat을 끝내는 기능
+    break
+  }
+}
+
+xr<- rep(5,20) # x.axis surf range
+yr<- seq(0, 10, length.out= 20) # y.axis surf range
+zr<- matrix(sort(seq(0, 10, length.out= 400), decreasing= T), ncol= 20, byrow= T) # z.axis surf range
+```
+
+```{r fig.show='animate', fig.width=10, fig.height=10, cache=FALSE, interval=0.05, aniopts="controls,loop"}
+
+for(i in 1:1200){
+  
+  le<- 0
+  ri<- 0
+  
+  le_space<- ""
+  ri_space<- ""
+  
+  for(j in 1:nm){
+    
+    if(dc[j,"x"]<=5){
+      le %<>% +1
+    } else{
+      ri %<>% +1
+    }
+  }
+  
+  if(le<10){
+    le_space<- " "
+  }
+  
+  if(ri<10){
+    ri_space<- " "
+  }
+  
+  scatter3D(dc$x, dc$y, dc$z, colvar= dc$Temp, col= c("blue", "red"), theta= 20, phi=30, pch= 19, cex=1.1, bty = "u", col.panel ="#005B00", col.grid = "#005000",
+            col.axis= "black", colkey = FALSE, xlim= c(0,10), ylim= c(0,10), zlim= c(0,10), ticktype = "detailed",
+            surf= list(x= xr, y= yr, z= zr, facets= NA, col=c(rev(rainbow(20)))), main ="Increasing Entropy",
+            sub= paste0("* 파란색: 온도 낮음, 빨간색: 온도 높음                                                                           총 분자 수:  ", nm, "   왼쪽 방 분자 수:  ", le_space, le, "   오른쪽 방 분자 수:  ", ri_space, ri, "       "))
+  
+  dc2<- data.frame(NULL)
+  
+  repeat{ # 분자들의 좌표가 무조건 겹칠 수밖에 없다면 분자 1부터 다시 새로운 위치를 정해주는 기능
+    
+    for(j in 1:nm){ # 각 분자들이 0.05초 동안 움직여서 나온 새로운 좌표를 기존의 데이터 프레임에 추가해주는 기능
+      
+      if(dc$mc[j]==dc$om[j] | dc$om[j]==-1){ # 아직 목적 이동 횟수가 안 정해졌거나 이미 목적 이동 횟수만큼 움직인 경우 목적 이동 횟수를 다시 지정해주는 기능
+        
+        dc$om[j]<- sample(1:20, 1) # 해당 분자가 다음 방향을 바꾸기 전 이동할 횟수
+        dc$mc[j]<- 0 # 분자가 같은 방향으로 이동한 횟수를 초기화해주는 기능
+        
+        dc2_1<- data.frame(NULL) # 해당 분자가 1초동안 움직일 경우 위치하게 될 곳의 정보를 담을 데이터 프레임
+        
+        ct<- 0 # count
+        
+        repeat{ # 새로 정해준 분자의 위치가 미리 위치를 정해준 분자들의 위치와 겹치지 않고 해당 분자의 위치가 주어진 좌표를 벗어나지 않을 경우에만 분자의 새로운 위치 값을 계속 쌓아주는 기능
+          
+          change<- sample(1:2,1)
+          
+          if(unique(dc[dc$particle==j,"Temp"])==2){ # 분자의 온도가 높은 경우
+            
+            mv<- 2 # mv: move
+          } else{ # 분자의 온도가 낮은 경우
+            
+            mv<- 0.8
+          }
+          
+          a<- dc[dc$particle== j & dc$num==i-1,4] # 분자의 기존 x 좌표
+          b<- dc[dc$particle== j & dc$num==i-1,5] # 분자의 기존 y 좌표
+          c<- dc[dc$particle== j & dc$num==i-1,6] # 분자의 기존 z 좌표
+          
+          if(ct==30){ ## 분자의 위치가 계속 겹치는 경우 일단 움직이지 못한다고 판단하는 기능
+            
+            cv<- c(a,b,c) # cv: changed value
+            
+          } else{ ## 분자의 원래 위치를 기준으로 하여 새로운 위치를 정해주는 기능
+            
+            x<- a + runif(1, min= -mv, max= mv) # 1초 동안 움직인 새로운 x좌표를 먼저 정해주는 기능
+            
+            y<- runif(1, min=(2* b- sqrt(4* b^2+ 4* (mv^2- (x- a)^2-b^2)))/ 2, max= (2* b+ sqrt(4* b^2+ 4* (mv^2- (x- a)^2-b^2)))/ 2)
+            
+            cons<- c^2 + c(x-a)^2 + c(y-b)^2 - mv^2 # 구의 방정식에서 z만 변수일 경우의 상수 부분(왼쪽으로 이항했을 경우)
+            
+            z<- switch(change, c+ sqrt(c^2- cons), c- sqrt(c^2- cons))
+            
+            delta_x<- (x-a)/ 20 # 해당 분자의 x 좌표가 0.05초 동안 바뀌는 정도
+            delta_y<- (y-b)/ 20 # 해당 분자의 y 좌표가 0.05초 동안 바뀌는 정도
+            delta_z<- (z-c)/ 20 # 해당 분자의 z 좌표가 0.05초 동안 바뀌는 정도
+            
+            cv<- c(a+ delta_x, b+ delta_y, c+ delta_z) # 해당 분자가 0.05초 동안 움직인 좌표
+            cv_1<- c(x,y,z) # 해당 분자가 1초 동안 움직인 좌표
+            
+          }
+          
+          if(any(cv_1< 0) | any(cv_1> 10)){ # 분자가 1초 동안 같은 방향으로 움직일 때 주어진 좌표를 벗어나게 되는 경우 위치를 다시 정해주는 기능
+            
+            next
+          }
+          
+          cvd_1<- data.frame(particle= j, Temp= unique(dc[dc$particle==j,"Temp"]), num= i, x= cv_1[1], y= cv_1[2], z= cv_1[3]) # cdf: changed value data.frame
+          dc2_1<- rbind(dc2_1, cvd_1)
+          
+          if(!any(duplicated(dc2_1[,4:6]))){ # 1초간 움직인 분자들의 위치가 전혀 겹치지 않는 경우
+            
+            cvd<- data.frame(particle= j, Temp= unique(dc[dc$particle==j,"Temp"]), num= i, x= cv[1], y= cv[2], z= cv[3], delx= delta_x, dely=  delta_y,
+                             delz= delta_z, mc= dc$mc[j]+ 1, om= dc$om[j]) # cdf: changed value data.frame
+            dc2<- rbind(dc2, cvd)
+            break
+            
+          } else if(ct>30){ # 1초 이후에 분자가 움직이지 못하는데 원래의 위치도 다른 분자가 차지하여 아예 존재할 수 없게 되는 경우 분자 1부터 새로운 위치를 다시 쌓아가게 만드는 기능
+            
+            break
+          }
+          
+          dc2<- dc2[-nrow(dc2),] # 분자의 새로운 위치가 잘못된 경우 다시 지정해주기 위해서 없애는 기능
+          
+          ct<- ct+1
+        }
+      } else{ # 분자가 같은 방향으로 이동한 횟수가 목적 횟수 미만일 경우 같은 방향으로 계속 이동하게 해주는 기능
+        
+        cv<- c(dc$x[j]+ dc$delx[j], dc$y[j]+ dc$dely[j], dc$z[j]+ dc$delz[j])
+        cvd<- data.frame(particle= j, Temp= unique(dc[dc$particle==j,"Temp"]), num= i, x= cv[1], y= cv[2], z= cv[3], delx= dc$delx[j], dely= dc$dely[j],
+                         delz= dc$delz[j], mc= dc$mc[j]+ 1, om= dc$om[j])
+        dc2<- rbind(dc2, cvd)
+      }
+    }
+    
+    if(!any(duplicated(dc2[,4:6]))){
+      break
+    }
+  }
+  
+  dc<- dc2
+}
+```
+

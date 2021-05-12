@@ -1,0 +1,112 @@
+---
+title: "Increasing Entropy"
+output: html_document
+---
+
+```{r}
+if(require(ggplot2)==F){
+  
+  install.packages("ggplot2")
+  library(ggplot2)
+}
+
+if(require(magrittr)==F){
+  
+  install.packages("magrittr")
+  library(magrittr)
+}
+
+if(require(plotly)==F){
+  
+  install.packages("plotly")
+  library(plotly)
+}
+
+repeat{ # 처음 원자들의 좌표를 정해주는 기능
+  
+  dc<- data.frame(particle= 1:20, Temp= rep(c("High","Low"), each= 10), sec= 0,  x= sample(1:5,20, replace= T), y= sample(1:10,20, replace= T)) # dots' coordinate
+  
+  if(!any(duplicated(dc[,4:5]))){ # 좌표가 겹치는 원자가 있는 지를 확인해서 없으면 repeat을 끝내는 기능
+    break
+  }
+}
+
+for(i in 1:60){
+  
+  dc2<- data.frame(NULL) # 원자들의 바뀐 위치를 담을 데이터 프레임
+  
+  success<- 0 # 후에 원자들의 좌표가 겹치지 않은 경우 1을 할당함
+  
+  repeat{ # 원자들의 좌표가 무조건 겹칠 수밖에 없다면 원자 1부터 다시 새로운 위치를 정해주는 기능
+    
+    for(j in 1:20){ # 각 원자들이 1초간 움직여서 나온 새로운 좌표를 기존의 데이터 프레임에 추가해주는 기능
+      
+      c<- 0
+      
+      repeat{ # 새로 정해준 원자들의 위치가 겹치지 않을 경우에만 원자의 새로운 위치 값을 계속 쌓아주는 기능 
+        
+        change<- sample(1:2,1)
+        
+        if(unique(dc[dc$particle==j,"Temp"])=="High"){
+          
+          mv<- 2 # mv: move
+        } else{
+          
+          mv<- 0.8
+        }
+        
+        a<- dc[dc$particle== j & dc$sec==i-1,4] # 원자의 기존 x 좌표
+        b<- dc[dc$particle== j & dc$sec==i-1,5] # 원자의 기존 y 좌표
+        
+        if(c==30){ ## 원자의 위치가 계속 겹치는 경우 일단 움직이지 못한다고 판단하는 기능
+          
+          cv<- c(a,b) # cv: changed value
+          
+        } else{ ## 원자의 원래 위치를 기준으로 하여 새로운 위치를 정해주는 기능
+          
+          y<- b + runif(1, min= -mv, max= mv) # 새로운 y좌표를 먼저 정해주는 기능
+          
+          x= switch(change, (2* a+ sqrt(4* a^2+ 4* (mv^2- (y- b)^2-a^2)))/ 2, (2* a- sqrt(4* a^2+ 4* (mv^2- (y- b)^2-a^2)))/ 2)
+          
+          cv<- c(x,y)
+        }
+        
+        if(any(cv< 1) | any(cv> 10)){ # 원자가 주어진 좌표를 벗어난 경우 위치를 다시 정해주는 기능
+          
+          next
+        }
+        
+        cv<- data.frame(particle= j, Temp= unique(dc[dc$particle==j,"Temp"]), sec= i, x= cv[1], y= cv[2])
+        
+        dc2<- rbind(dc2, cv)
+        
+        if(!any(duplicated(dc2[,c(4,5)]))){ # 원자들의 위치가 전혀 겹치지 않는 경우
+          
+          success<- 1
+          break
+        } else if(c>30){ # 원자가 움직이지 못하는데 원래의 위치도 다른 원자가 차지하여 아예 존재할 수 없게 되는 경우 원자 1부터 새로운 위치를 다시 쌓아가게 만드는 기능
+          break
+        }
+        
+        dc2<- dc2[-nrow(dc2),]
+        
+        c<- c+1
+      }
+    }
+    
+    if(success==1){
+      break
+    }
+  }
+  
+  dc<- rbind(dc,dc2)
+}
+
+dc %<>% arrange(particle, sec) # 원자의 번호와 지나간 시간을 기준으로 하여 오름차순 정렬해주는 기능
+
+graph<- ggplot(dc, aes(x= x, y= y, color= Temp)) + geom_point(aes(id= particle, frame = sec)) + scale_x_continuous(breaks= 1:10, limits= c(1,10)) + scale_y_continuous(breaks= 1:10, limits= c(1,10)) +
+  geom_vline(xintercept= 5.5, linetype= 3,  size=1.5)
+
+ggplotly(graph)
+```
+
